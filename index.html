@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>共享下班倒數</title>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    #form { margin-bottom: 1rem; }
+    #list { margin-top: 1rem; }
+    .item { padding: 0.5rem; border-bottom: 1px solid #ddd; }
+    .name { font-weight: bold; }
+    .timer { float: right; }
+  </style>
+  <!-- 1. 載入 Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <h1>共享下班倒數</h1>
+
+  <!-- 報到表單 -->
+  <div id="form">
+    <input type="text" id="yourName" placeholder="請輸入姓名" />
+    <input type="time" id="yourStart" value="08:00" />
+    <button id="btnGo">我要報到</button>
+  </div>
+
+  <!-- 顯示列表 -->
+  <div id="list"></div>
+
+  <script>
+  // 2. 初始化 Firebase
+    // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyB8lK1b6nx2hunGNwHutpBCO-BeKO5XntQ",
+    authDomain: "countdown-11b34.firebaseapp.com",
+    databaseURL: "https://countdown-11b34-default-rtdb.firebaseio.com",
+    projectId: "countdown-11b34",
+    storageBucket: "countdown-11b34.appspot.com",
+    messagingSenderId: "338264464503",
+    appId: "1:338264464503:web:507ef5a71113162a91fa72",
+    measurementId: "G-TE12G16JLZ"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // 3. 常數：工作 8h + 午休 1h
+  const WORK_MS  =  8 * 3600 * 1000;
+  const BREAK_MS =  1 * 3600 * 1000;
+
+  // 4. 使用者按「我要報到」
+  document.getElementById('btnGo').onclick = () => {
+    const name  = document.getElementById('yourName').value.trim();
+    const start = document.getElementById('yourStart').value;
+    if (!name || !start) {
+      return alert('請輸入姓名及上班時間');
+    }
+    // 用 push() 也可以，但為了覆蓋同一人可改用 name 當 key
+    const key = name.replace(/\s+/g,'_');
+    db.ref('checkin/' + key).set({
+      name: name,
+      startTime: start,
+      timestamp: Date.now()
+    });
+  };
+
+  // 5. 監聽資料庫變動，更新畫面
+  const listEl = document.getElementById('list');
+  db.ref('checkin').on('value', snap => {
+    const data = snap.val() || {};
+    listEl.innerHTML = '';
+    // 依姓名排序 (可改)
+    Object.values(data)
+      .sort((a,b)=> a.name.localeCompare(b.name))
+      .forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML = `
+          <span class="name">${item.name}</span>
+          <span class="timer" data-start="${item.startTime}">--:--:--</span>
+        `;
+        listEl.appendChild(div);
+      });
+  });
+
+  // 6. 每秒更新所有人的倒數
+  setInterval(()=>{
+    document.querySelectorAll('.timer').forEach(el=>{
+      const now = new Date();
+      // 解析今天的上班時間
+      const [hh, mm] = el.dataset.start.split(':').map(n=>parseInt(n));
+      const dtStart = new Date();
+      dtStart.setHours(hh, mm, 0, 0);
+      // 下班時間 = 上班 + 工作 + 午休
+      let dtEnd = new Date(dtStart.getTime() + WORK_MS + BREAK_MS);
+      if (now > dtEnd) {
+        // 如果今天已過，倒數到明天
+        dtEnd = new Date(dtEnd.getTime() + 24*3600*1000);
+      }
+      let diff = dtEnd - now;
+      const H = String(Math.floor(diff/1000/3600)).padStart(2,'0');
+      const M = String(Math.floor(diff/1000/60%60)).padStart(2,'0');
+      const S = String(Math.floor(diff/1000%60)).padStart(2,'0');
+      el.textContent = `${H}:${M}:${S}`;
+    });
+  }, 1000);
+  </script>
+
+</body>
+</html>
