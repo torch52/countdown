@@ -1,194 +1,579 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>共享下班倒數</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>上班囉!</title>
   <style>
-    body { font-family: sans-serif; padding: 1rem; }
-    #form { margin-bottom: 1rem; }
-    #list { margin-top: 1rem; }
-    .item { padding: 0.5rem; border-bottom: 1px solid #ddd; }
-    .name { font-weight: bold; }
-    .timer { float: right; }
+    :root{
+      --bg: #f2f1f0;
+      --card: #f9f7f6;
+      --accent: #bbafa4;
+      --muted: #6a5f58;
+      --text: #3e3a36;
+      --btn-text: #fff;
+    }
+    /* 全域 */
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;
+    }
+    header{
+      display:flex; justify-content:space-between; align-items:center;
+      gap:12px; padding:14px 18px;
+      background:linear-gradient(90deg,var(--card),var(--bg));
+      border-bottom:1px solid rgba(0,0,0,0.04);
+    }
+    header h1{margin:0;font-size:1.15rem}
+    #date{font-size:0.9rem;color:var(--muted)}
+
+    main{max-width:920px;margin:18px auto;padding:16px;display:flex;gap:18px;align-items:flex-start;}
+    /* 左區塊（簽到）*/
+    .left{flex:1; background:var(--card); padding:14px;border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.04)}
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    input[type="text"], input[type="time"], select {
+      padding:8px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); font-size:0.95rem;
+      background: #fff;
+    }
+    button { padding:8px 10px; border-radius:8px; border:none; background:var(--accent); color:var(--btn-text); cursor:pointer; font-size:0.95rem;}
+    button.ghost{background:transparent; color:var(--muted); border:1px solid rgba(0,0,0,0.06)}
+    #list{margin-top:12px}
+    .person{display:flex; justify-content:space-between; align-items:center; padding:10px; border-radius:8px; margin-bottom:8px; background:rgba(255,255,255,0.85); border:1px solid rgba(0,0,0,0.02)}
+    .person .leftInfo{display:flex; gap:12px; align-items:center;}
+    .pname{font-weight:700}
+    .ptime{font-size:0.9rem; color:var(--muted)}
+    .countdown{font-weight:700; color:var(--muted)}
+    .adminBtns button{margin-left:6px; padding:6px 8px; font-size:0.8rem}
+
+    /* 右區塊（每日 / 幸運色 / 笑話）*/
+    .right{width:300px; background:var(--card); padding:14px; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.04)}
+    .card{margin-bottom:12px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.9)}
+    .colorChip{display:inline-flex;align-items:center;gap:8px;margin-top:6px}
+    .swatch{width:28px;height:20px;border-radius:4px;border:1px solid rgba(0,0,0,0.06);display:inline-block;vertical-align:middle}
+
+    /* 主題選單 */
+    .themeSel{margin-left:8px}
+
+    /* 齒輪（管理）*/
+    #gear{width:36px;height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;background:transparent; border:1px solid rgba(0,0,0,0.04)}
+    #gear svg{width:20px;height:20px; fill:var(--muted)}
+    /* 密碼 modal */
+    .modalBg{position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; align-items:center; justify-content:center; z-index:60}
+    .modal{background:var(--card); padding:16px;border-radius:10px; width:320px; box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+    .modal input{width:100%; margin-top:8px}
+
+    /* 留言板（右下彈出）*/
+    #msgButton{
+      position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%;
+      background:var(--accent); color:var(--btn-text); display:flex;align-items:center;justify-content:center; cursor:pointer; z-index:55; box-shadow:0 8px 20px rgba(0,0,0,0.12)
+    }
+    #msgPanel{position:fixed; right:18px; bottom:86px; width:340px; max-height:68vh; background:var(--card); border-radius:10px; box-shadow:0 12px 36px rgba(0,0,0,0.18); padding:10px; display:none; flex-direction:column; z-index:55}
+    #msgPanel header{display:flex; justify-content:space-between; align-items:center; gap:8px}
+    #msgList{overflow:auto; max-height:46vh; margin-top:10px}
+    .msgItem{padding:8px; border-radius:8px; margin-bottom:8px; background:rgba(255,255,255,0.92); border:1px solid rgba(0,0,0,0.04); position:relative}
+    .msgItem time{display:block;font-size:0.75rem;color:var(--muted); margin-top:6px}
+    .msgControls{position:absolute; top:6px; right:8px}
+    .msgControls button{background:transparent;border:none;color:var(--muted); cursor:pointer; font-size:0.85rem}
+
+    /* 小提醒 / 彈窗樣式 */
+    .toast{position:fixed; left:50%; transform:translateX(-50%); top:22px; background:#fff; padding:10px 14px; border-radius:8px; box-shadow:0 8px 26px rgba(0,0,0,0.14); display:none; z-index:70}
+
+    /* 回應式 */
+    @media(max-width:880px){
+      main{flex-direction:column;padding:12px}
+      .right{width:100%}
+      #msgPanel{right:12px; left:12px; width:auto}
+    }
   </style>
-  <!-- 1. 載入 Firebase SDK -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 </head>
 <body>
-<h1>共享下班倒數</h1>
+  <header>
+    <div>
+      <h1>上班囉!</h1>
+      <div id="date">載入日期...</div>
+    </div>
 
-<!-- 管理區 -->
-<div id="adminArea" style="margin-bottom:1rem;">
-  <input type="password" id="adminPwd" placeholder="管理密碼" />
-  <button id="adminLogin">登入管理員</button>
-</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <label for="themeSelect" style="color:var(--muted)">主題</label>
+      <select id="themeSelect" class="themeSel" title="切換主題"></select>
+      <div id="gear" title="管理員設定 (點擊輸入密碼)">
+        <!-- simple gear icon -->
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14,12.94a7.14,7.14,0,0,0,0-1.88l2.03-1.58a0.5,0.5,0,0,0,.12-0.64l-1.92-3.32a0.5,0.5,0,0,0-.6-0.22l-2.39,0.96a7.05,7.05,0,0,0-1.62-0.94L14.8,2.5a0.5,0.5,0,0,0-.5-0.5H10a0.5,0.5,0,0,0-.5.5L9,4.2a7.05,7.05,0,0,0-1.62.94L4.96,4.2a0.5,0.5,0,0,0-.6.22L2.44,7.74a0.5,0.5,0,0,0,.12.64L4.59,10a7.14,7.14,0,0,0,0,1.88L2.56,13.46a0.5,0.5,0,0,0-.12.64l1.92,3.32a0.5,0.5,0,0,0,.6.22l2.39-0.96a7.05,7.05,0,0,0,1.62.94L9.5,21.5a0.5,0.5,0,0,0,.5.5h4.3a0.5,0.5,0,0,0,.5-0.5l0.12-2.12a7.05,7.05,0,0,0,1.62-.94l2.39,0.96a0.5,0.5,0,0,0,.6-0.22l1.92-3.32a0.5,0.5,0,0,0-.12-0.64ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/></svg>
+      </div>
+    </div>
+  </header>
 
-<!-- 報到表單 -->
-<div id="form">
-  <input type="text" id="yourName" placeholder="請輸入姓名" />
-  <input type="time" id="yourStart" value="08:00" />
-  <button id="btnGo">我要報到</button>
-</div>
+  <main>
+    <section class="left">
+      <div class="controls">
+        <input id="nameInput" type="text" placeholder="請輸入姓名"/>
+        <input id="timeInput" type="time" />
+        <button id="checkinBtn">簽到 / 更新上班時間</button>
+        <button id="refreshBtn" class="ghost" title="重新整理顯示">重新整理</button>
+      </div>
 
-<!-- 顯示列表 -->
-<div id="list"></div>
+      <div id="list"></div>
+    </section>
 
-<!-- 留言板浮動小圖示 -->
-<div id="chatToggle" style="
-    position:fixed; bottom:20px; right:20px;
-    width:50px; height:50px;
-    background:#007bff; color:#fff; border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer; z-index:9999;">
-  💬
-</div>
+    <aside class="right">
+      <div class="card">
+        <div><strong>今日笑話 / Joke of the day</strong></div>
+        <div id="jokeZh" style="margin-top:8px;color:var(--muted)">載入中…</div>
+        <div id="jokeEn" style="margin-top:6px;font-size:0.95rem;color:#556">loading...</div>
+      </div>
 
-<!-- 留言板主視窗（預設隱藏） -->
-<div id="chatBox" style="
-    position:fixed; bottom:20px; right:20px;
-    width:300px; height:300px;
-    border:1px solid #aaa; background:#fff;
-    border-radius:8px;
-    display:none; flex-direction:column; resize:both; overflow:auto; z-index:9998;">
-  <div style="display:flex; justify-content:space-between; background:#eee; padding:5px; cursor:move;">
-    <span>留言板</span>
-    <button id="chatClose">✖</button>
+      <div class="card">
+        <div><strong>今日幸運色</strong></div>
+        <div style="margin-top:8px">
+          <div>♏ 天蠍： <span id="scorpioName" class="ptime"></span> <span class="swatch" id="scorpioSw"></span></div>
+          <div style="margin-top:6px">♑ 摩羯： <span id="capricornName" class="ptime"></span> <span class="swatch" id="capricornSw"></span></div>
+        </div>
+      
+      </div>
+    </aside>
+  </main>
+
+  <!-- 留言按鈕與面板 -->
+  <div id="msgButton" title="留言板">💬</div>
+  <div id="msgPanel">
+    <header>
+      <strong>留言板</strong>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="msgName" type="text" placeholder="你的名字" style="padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)"/>
+      </div>
+    </header>
+    <div id="msgList"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="msgInput" type="text" placeholder="輸入留言..." style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06)"/>
+      <button id="msgSend">送出</button>
+    </div>
   </div>
-  <div id="chatMessages" style="flex:1; padding:5px; overflow:auto;"></div>
-  <div style="display:flex; border-top:1px solid #ddd;">
-    <input id="chatInput" placeholder="輸入留言..." style="flex:1; border:none; padding:5px;">
-    <button id="chatSend">送出</button>
+
+  <!-- 密碼 modal -->
+  <div class="modalBg" id="modalBg">
+    <div class="modal">
+      <div style="font-weight:700">管理員登入</div>
+      <div style="margin-top:8px;color:var(--muted)">請輸入管理員密碼：</div>
+      <input id="adminPwd" type="password" placeholder="管理員密碼"/>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button id="adminCancel" class="ghost">取消</button>
+        <button id="adminSubmit">登入</button>
+      </div>
+    </div>
   </div>
-</div>
 
-<script>
-  // 🔸 初始化 Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyB8lK1b6nx2hunGNwHutpBCO-BeKO5XntQ",
-    authDomain: "countdown-11b34.firebaseapp.com",
-    databaseURL: "https://countdown-11b34-default-rtdb.firebaseio.com",
-    projectId: "countdown-11b34",
-    storageBucket: "countdown-11b34.appspot.com",
-    messagingSenderId: "338264464503",
-    appId: "1:338264464503:web:507ef5a71113162a91fa72",
-    measurementId: "G-TE12G16JLZ"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <!-- toast -->
+  <div class="toast" id="toast"></div>
 
-  const WORK_MS  = 8 * 3600 * 1000;
-  const BREAK_MS = 1 * 3600 * 1000;
-  const ADMIN_PWD = "admin123";
-  let isAdmin = false;
+  <script>
+    // ---------- Firebase init ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyB8lK1b6nx2hunGNwHutpBCO-BeKO5XntQ",
+      authDomain: "countdown-11b34.firebaseapp.com",
+      databaseURL: "https://countdown-11b34-default-rtdb.firebaseio.com",
+      projectId: "countdown-11b34",
+      storageBucket: "countdown-11b34.firebasestorage.app",
+      messagingSenderId: "338264464503",
+      appId: "1:338264464503:web:208f563c619e6f8d91fa72",
+      measurementId: "G-M55822MGYT"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  // 自動記住姓名
-  const nameInput = document.getElementById('yourName');
-  const savedName = localStorage.getItem('userName');
-  if(savedName) nameInput.value = savedName;
-  nameInput.addEventListener('input', ()=>{localStorage.setItem('userName', nameInput.value.trim());});
+    // ---------- Config ----------
+    const ADMIN_PASSWORD = "Pam3CSK4"; // you requested
+    let isAdmin = false;
 
-  // 報到
-  document.getElementById('btnGo').onclick = ()=>{
-    const name = nameInput.value.trim();
-    const start = document.getElementById('yourStart').value;
-    if(!name || !start) return alert('請輸入姓名及上班時間');
-    const key = name.replace(/\s+/g,'_');
-    db.ref('checkin/'+key).set({name, startTime:start, timestamp:Date.now()});
-    localStorage.setItem('userName', name);
-  };
+    // ---------- DOM ----------
+    const dateEl = document.getElementById('date');
+    const themeSelect = document.getElementById('themeSelect');
+    const nameInput = document.getElementById('nameInput');
+    const timeInput = document.getElementById('timeInput');
+    const checkinBtn = document.getElementById('checkinBtn');
+    const listEl = document.getElementById('list');
+    const refreshBtn = document.getElementById('refreshBtn');
 
-  // 管理員登入
-  document.getElementById('adminLogin').onclick = ()=>{
-    const val = document.getElementById('adminPwd').value;
-    if(val===ADMIN_PWD){
-      isAdmin = true;
-      alert('管理員登入成功');
-      renderList();
-    }else alert('密碼錯誤');
-  };
+    const jokeZhEl = document.getElementById('jokeZh');
+    const jokeEnEl = document.getElementById('jokeEn');
 
-  // 顯示名單
-  const listEl = document.getElementById('list');
-  db.ref('checkin').on('value', snap=>{
-    window.currentData = snap.val() || {};
-    renderList();
-  });
+    const scorpioNameEl = document.getElementById('scorpioName');
+    const scorpioSwEl = document.getElementById('scorpioSw');
+    const capricornNameEl = document.getElementById('capricornName');
+    const capricornSwEl = document.getElementById('capricornSw');
 
-  function renderList(){
-    const data = window.currentData || {};
-    listEl.innerHTML = '';
-    Object.values(data)
-      .sort((a,b)=> a.name.localeCompare(b.name))
-      .forEach(item=>{
-        const div = document.createElement('div');
-        div.className='item';
-        const key = item.name.replace(/\s+/g,'_');
-        div.innerHTML=`
-          <span class="name">${item.name}</span>
-          <span class="timer" data-start="${item.startTime}" data-key="${key}">--:--:--</span>
-          ${isAdmin?`<button class="delBtn" data-key="${key}">刪除</button>`:''}
-        `;
-        listEl.appendChild(div);
+    // msg panel
+    const msgButton = document.getElementById('msgButton');
+    const msgPanel = document.getElementById('msgPanel');
+    const msgList = document.getElementById('msgList');
+    const msgInput = document.getElementById('msgInput');
+    const msgSend = document.getElementById('msgSend');
+    const msgName = document.getElementById('msgName');
+
+    // modal
+    const gear = document.getElementById('gear');
+    const modalBg = document.getElementById('modalBg');
+    const adminPwd = document.getElementById('adminPwd');
+    const adminSubmit = document.getElementById('adminSubmit');
+    const adminCancel = document.getElementById('adminCancel');
+
+    const toast = document.getElementById('toast');
+
+    // ---------- Utility ----------
+    function showToast(text, timeout=2800){
+      toast.textContent = text;
+      toast.style.display = 'block';
+      setTimeout(()=>toast.style.display='none', timeout);
+    }
+
+    function pad(n){ return n.toString().padStart(2,'0'); }
+
+    // ---------- Date display ----------
+    function renderDate(){
+      const d = new Date();
+      const dateStr = d.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+      dateEl.textContent = `📅 ${dateStr}`;
+    }
+    renderDate();
+
+    // ---------- Themes (5 Mo rand i-like palettes) ----------
+    const THEMES = [
+      {name:'晨霧米 (奶茶系)', vars:{'--bg':'#f3f2ef','--card':'#f9f7f5','--accent':'#bfb1a6','--muted':'#6e6158','--text':'#3e3a36'}},
+      {name:'霧藍綠', vars:{'--bg':'#eef1f0','--card':'#f6f8f7','--accent':'#aebdb6','--muted':'#5f6b66','--text':'#39413f'}},
+      {name:'藕粉灰', vars:{'--bg':'#f6f4f5','--card':'#fbf8f8','--accent':'#c8b3b8','--muted':'#6a5b60','--text':'#3d3336'}},
+      {name:'淺卡其綠', vars:{'--bg':'#f4f6f4','--card':'#fbfcfb','--accent':'#bfc7b8','--muted':'#656b60','--text':'#344031'}},
+      {name:'石灰白藍', vars:{'--bg':'#f1f3f4','--card':'#fbfbfc','--accent':'#b9c0c6','--muted':'#615e61','--text':'#333538'}}
+    ];
+
+    function loadThemeOptions(){
+      THEMES.forEach((t, i)=>{
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = t.name;
+        themeSelect.appendChild(opt);
       });
-    if(isAdmin){
-      document.querySelectorAll('.delBtn').forEach(btn=>{
-        btn.onclick = ()=>db.ref('checkin/'+btn.dataset.key).remove();
+      // load from localStorage
+      const saved = localStorage.getItem('wb_theme');
+      const idx = saved !== null ? Number(saved) : 0;
+      themeSelect.value = idx;
+      applyTheme(idx);
+    }
+    function applyTheme(idx){
+      const t = THEMES[idx] || THEMES[0];
+      Object.entries(t.vars).forEach(([k,v])=>document.documentElement.style.setProperty(k, v));
+      localStorage.setItem('wb_theme', idx);
+    }
+    themeSelect.addEventListener('change', ()=>applyTheme(themeSelect.value));
+    loadThemeOptions();
+
+    // ---------- Jokes (zh + en) ----------
+    const JOKES = [
+      {zh:'昨天加班太久，連夢都在開會。', en:"Worked overtime yesterday — even my dreams had meetings."},
+      {zh:'午休太短，夢都來不及發展。', en:"Lunch break too short — my dreams didn't have time to develop."},
+      {zh:'開完會又開會，會不會開出新人生？', en:"After one meeting, another meeting — will a new life emerge from all these meetings?"},
+      {zh:'別懷疑，今天也是適合偷懶的一天。', en:"Don't doubt it — today is another day fit for a little slacking."},
+      {zh:'咖啡 + 微笑 = 職場生存公式。', en:"Coffee + smile = the workplace survival formula."},
+      {zh:'你的笑容比老闆的讚美更能撐過星期一！', en:"Your smile beats the boss's praise for surviving Monday."},
+      {zh:'早起不是夢，只是鬧鐘太兇。', en:"Waking up early isn't a dream — it's just that the alarm is too fierce."},
+      {zh:'努力上班只是為了下班更理直氣壯。', en:"We work hard so we can leave work with a clear conscience."}
+    ];
+    function showDailyJoke(){
+      const day = new Date().getDate();
+      const j = JOKES[day % JOKES.length];
+      jokeZhEl.textContent = "🤪 " + j.zh;
+      jokeEnEl.textContent = "🙂 " + j.en;
+    }
+    showDailyJoke();
+
+    // ---------- Lucky colors (any colors allowed, not limited to Morandi) ----------
+    // each entry: {name, hex}
+    const SCORPIO_COLORS = [
+      {name:'象牙白', hex:'#F6F3ED'},
+      {name:'夜霧紫', hex:'#6E5673'},
+      {name:'深海石板', hex:'#3C556E'},
+      {name:'奶霜灰', hex:'#DCD7D0'},
+      {name:'墨藍', hex:'#23394B'},
+      {name:'葡萄酒紅', hex:'#7A2F3F'}
+    ];
+    const CAPRICORN_COLORS = [
+      {name:'霧藍灰', hex:'#A7B1AD'},
+      {name:'砂岩褐', hex:'#A8937B'},
+      {name:'深石板', hex:'#556066'},
+      {name:'象牙白', hex:'#FBF7F2'},
+      {name:'松綠', hex:'#6B7A6F'},
+      {name:'晨霧灰', hex:'#CFC7C1'}
+    ];
+    function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+    function showLuckyColors(){
+      const sc = pickRandom(SCORPIO_COLORS);
+      const cp = pickRandom(CAPRICORN_COLORS);
+      scorpioNameEl.textContent = `${sc.name} (${sc.hex})`;
+      scorpioSwEl.style.background = sc.hex;
+      scorpioSwEl.title = sc.name + ' ' + sc.hex;
+
+      capricornNameEl.textContent = `${cp.name} (${cp.hex})`;
+      capricornSwEl.style.background = cp.hex;
+      capricornSwEl.title = cp.name + ' ' + cp.hex;
+    }
+    showLuckyColors();
+
+    // ---------- Birthdays & Valentine's popups ----------
+    // We'll show popup if today's month-day matches any of these:
+    const SPECIAL_DATES = {
+      // month-day : message
+      '11-14': '🎂 祝 婷妃 生日快樂！生日快樂，婷妃～ 💖',
+      '12-29': '🎉 祝 Allen 生日快樂！生日快樂，Allen～ 🎂',
+      '02-14': '💘 情人節快樂！Happy Valentine\'s Day!',
+      '05-20': '💘 520 情人節快樂！' // user requested "每個情人節當天都顯示" - we include 5/20 too
+      // Note: 七夕 (農曆) 若要支援需額外 lunar conversion
+    };
+    function checkSpecialDay(){
+      const d = new Date();
+      const key = pad(d.getMonth()+1) + '-' + pad(d.getDate());
+      if(SPECIAL_DATES[key]){
+        setTimeout(()=>showModalToast(SPECIAL_DATES[key]), 600);
+      }
+    }
+    function showModalToast(text){
+      // reuse toast but keep slightly longer and show prominently
+      toast.textContent = text;
+      toast.style.display = 'block';
+      setTimeout(()=>toast.style.display='none', 6500);
+    }
+    checkSpecialDay();
+
+    // ---------- Sign-in / Checkin logic ----------
+    // save name to localStorage for convenience
+    const savedName = localStorage.getItem('wb_name');
+    if(savedName) nameInput.value = savedName;
+    nameInput.addEventListener('input', ()=>localStorage.setItem('wb_name', nameInput.value.trim()));
+
+    // default timeInput to current time
+    function setTimeToNow(){
+      const d = new Date();
+      timeInput.value = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    setTimeToNow();
+
+    checkinBtn.addEventListener('click', ()=> {
+      const name = nameInput.value.trim();
+      const t = timeInput.value;
+      if(!name) return alert('請輸入姓名');
+      if(!t) return alert('請選擇上班時間');
+      const key = name.replace(/\s+/g,'_');
+      // compute end time = t + 9 hours (in today's date)
+      const parts = t.split(':').map(x=>Number(x));
+      const now = new Date();
+      const startDt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0], parts[1], 0, 0);
+      const endDt = new Date(startDt.getTime() + 9*3600*1000);
+      db.ref('checkin/'+key).set({
+        name,
+        start: startDt.getTime(),
+        end: endDt.getTime(),
+        timestamp: Date.now()
+      }).then(()=> {
+        showToast('簽到已記錄');
+      }).catch(err=>console.error(err));
+    });
+
+    // render checkins from firebase
+    let currentCheckins = {};
+    db.ref('checkin').on('value', snap=> {
+      currentCheckins = snap.val() || {};
+      renderCheckins();
+    });
+
+    function renderCheckins(){
+      listEl.innerHTML = '';
+      const arr = Object.entries(currentCheckins).map(([k,v])=>({key:k, ...v}));
+      arr.sort((a,b)=> a.name.localeCompare(b.name, 'zh-Hant'));
+      arr.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'person';
+        const start = new Date(Number(item.start));
+        const end = new Date(Number(item.end));
+        const startStr = start.toLocaleTimeString('zh-TW',{hour12:false});
+        const endStr = end.toLocaleTimeString('zh-TW',{hour12:false});
+        el.innerHTML = `
+          <div class="leftInfo">
+            <div>
+              <div class="pname">${item.name}</div>
+              <div class="ptime">上班 ${startStr} ｜ 下班 ${endStr}</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end">
+            <div class="countdown" data-end="${item.end}" id="cd_${item.key}">--:--:--</div>
+            <div class="adminBtns"></div>
+          </div>
+        `;
+        // admin buttons (shown only when isAdmin)
+        const adminBtns = el.querySelector('.adminBtns');
+        if(isAdmin){
+          const del = document.createElement('button'); del.textContent='刪除'; del.style.background='#e08c8c';
+          del.onclick = ()=> {
+            if(confirm(`確定刪除 ${item.name} 的簽到紀錄？`)) db.ref('checkin/'+item.key).remove();
+          };
+          const edit = document.createElement('button'); edit.textContent='編輯'; edit.style.background='#bbb';
+          edit.onclick = ()=> {
+            // edit name and/or start time
+            const newName = prompt('修改姓名：', item.name);
+            if(newName===null) return;
+            const newTime = prompt('修改上班時間 (HH:mm)：', startStr);
+            if(newTime===null) return;
+            const parts = newTime.split(':').map(x=>Number(x));
+            const dtStart = new Date(Number(item.start));
+            dtStart.setHours(parts[0], parts[1], 0, 0);
+            const dtEnd = new Date(dtStart.getTime() + 9*3600*1000);
+            const newKey = newName.replace(/\s+/g,'_');
+            // update: if key changed, remove old and set new
+            const payload = {name:newName, start: dtStart.getTime(), end: dtEnd.getTime(), timestamp: Date.now()};
+            // if key changed
+            if(newKey !== item.key){
+              db.ref('checkin/'+newKey).set(payload).then(()=> db.ref('checkin/'+item.key).remove());
+            } else {
+              db.ref('checkin/'+item.key).set(payload);
+            }
+          };
+          adminBtns.appendChild(edit); adminBtns.appendChild(del);
+        }
+        listEl.appendChild(el);
       });
     }
-  }
 
-  // 倒數與自動刪除
-  setInterval(()=>{
-    document.querySelectorAll('.timer').forEach(el=>{
-      const now = new Date();
-      const [hh,mm] = el.dataset.start.split(':').map(n=>parseInt(n));
-      const dtStart = new Date(); dtStart.setHours(hh,mm,0,0);
-      let dtEnd = new Date(dtStart.getTime()+WORK_MS+BREAK_MS);
-      if(now>dtEnd){db.ref('checkin/'+el.dataset.key).remove(); return;}
-      const diff = dtEnd-now;
-      const H = String(Math.floor(diff/1000/3600)).padStart(2,'0');
-      const M = String(Math.floor(diff/1000/60%60)).padStart(2,'0');
-      const S = String(Math.floor(diff/1000%60)).padStart(2,'0');
-      el.textContent=`${H}:${M}:${S}`;
-    });
-  },1000);
-
-  // 💬 留言板
-  const chatBox = document.getElementById('chatBox');
-  const chatToggle = document.getElementById('chatToggle');
-  const chatClose = document.getElementById('chatClose');
-  const chatMsg = document.getElementById('chatMessages');
-  const chatInput = document.getElementById('chatInput');
-  const chatSend = document.getElementById('chatSend');
-
-  const currentName = ()=>nameInput.value.trim()||'匿名';
-
-  chatToggle.onclick = ()=>{chatBox.style.display='flex'; chatToggle.style.display='none';};
-  chatClose.onclick = ()=>{chatBox.style.display='none'; chatToggle.style.display='flex';};
-
-  chatSend.onclick = ()=>{
-    const text = chatInput.value.trim();
-    if(!text) return;
-    db.ref('messages').push({name:currentName(), text, timestamp:Date.now()});
-    chatInput.value='';
-  };
-
-  db.ref('messages').on('value', snap=>{
-    const msgs = snap.val()||{};
-    chatMsg.innerHTML='';
-    Object.values(msgs)
-      .sort((a,b)=>a.timestamp-b.timestamp)
-      .forEach(m=>{
-        const p=document.createElement('div');
-        const t = new Date(m.timestamp).toLocaleTimeString();
-        p.textContent=`[${t}] ${m.name}: ${m.text}`;
-        chatMsg.appendChild(p);
+    // countdown updater
+    setInterval(()=>{
+      document.querySelectorAll('.countdown').forEach(el=>{
+        const end = Number(el.dataset.end);
+        if(!end) { el.textContent='--:--:--'; return; }
+        const diff = end - Date.now();
+        if(diff <= 0){
+          el.textContent = '已下班';
+          // do not auto-remove unless admin wants
+        } else {
+          const H = Math.floor(diff/3600000);
+          const M = Math.floor(diff%3600000/60000);
+          const S = Math.floor(diff%60000/1000);
+          el.textContent = `${pad(H)}:${pad(M)}:${pad(S)}`;
+        }
       });
-    chatMsg.scrollTop = chatMsg.scrollHeight;
-  });
-</script>
+    }, 1000);
+
+    refreshBtn.addEventListener('click', ()=> renderCheckins());
+
+    // ---------- Messages (Firebase) ----------
+    msgButton.addEventListener('click', ()=> {
+      msgPanel.style.display = msgPanel.style.display === 'flex' ? 'none' : 'flex';
+    });
+
+    msgSend.addEventListener('click', ()=> {
+      const text = msgInput.value.trim();
+      if(!text) return;
+      const who = (msgName.value || nameInput.value || '匿名').trim();
+      const entryRef = db.ref('messages').push();
+      entryRef.set({
+        name: who,
+        text,
+        time: Date.now()
+      }).then(()=>{
+        msgInput.value = '';
+        showToast('留言已送出');
+      });
+    });
+
+    let currentMsgs = {};
+    db.ref('messages').on('value', snap=>{
+      currentMsgs = snap.val() || {};
+      renderMsgs();
+    });
+
+    function renderMsgs(){
+      msgList.innerHTML = '';
+      // convert to array and sort newest first
+      const arr = Object.entries(currentMsgs).map(([k,v])=>({k,...v}));
+      arr.sort((a,b)=> b.time - a.time);
+      arr.forEach(obj=>{
+        const div = document.createElement('div');
+        div.className = 'msgItem';
+        const t = new Date(obj.time).toLocaleString('zh-TW', {hour12:false});
+        div.innerHTML = `<div><strong>${escapeHtml(obj.name)}</strong></div>
+                         <div style="margin-top:6px">${escapeHtml(obj.text)}</div>
+                         <time>${t}</time>`;
+        if(isAdmin){
+          const ctrl = document.createElement('div'); ctrl.className='msgControls';
+          const editBtn = document.createElement('button'); editBtn.innerText='編輯';
+          editBtn.onclick = ()=> {
+            const newText = prompt('編輯留言內容：', obj.text);
+            if(newText !== null) db.ref('messages/'+obj.k+'/text').set(newText);
+          };
+          const delBtn = document.createElement('button'); delBtn.innerText='刪除';
+          delBtn.onclick = ()=> {
+            if(confirm('確定刪除留言？')) db.ref('messages/'+obj.k).remove();
+          };
+          ctrl.appendChild(editBtn); ctrl.appendChild(delBtn);
+          div.appendChild(ctrl);
+        }
+        msgList.appendChild(div);
+      });
+    }
+
+    // simple HTML escaper to avoid injection
+    function escapeHtml(s){
+      if(!s) return '';
+      return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
+    }
+
+    // admin modal handling
+    gear.addEventListener('click', ()=> {
+      modalBg.style.display = 'flex';
+      adminPwd.value = '';
+      adminPwd.focus();
+    });
+    adminCancel.addEventListener('click', ()=> modalBg.style.display = 'none');
+
+    adminSubmit.addEventListener('click', ()=> {
+      const val = adminPwd.value;
+      if(val === ADMIN_PASSWORD){
+        isAdmin = true;
+        modalBg.style.display = 'none';
+        showToast('管理員已登入');
+        renderCheckins();
+        renderMsgs();
+      } else {
+        alert('密碼錯誤');
+      }
+    });
+
+    // allow pressing Enter in pwd
+    adminPwd.addEventListener('keydown', (e)=> { if(e.key === 'Enter') adminSubmit.click(); });
+
+    // ---------- Admin persistence: toggle logout on reload? ----------
+    // We'll remember admin in session only
+    // If want to persist, set sessionStorage flag
+    // For now, remember for the session
+    window.addEventListener('beforeunload', ()=>{ /* nothing */ });
+
+    // ---------- Startup: populate theme select, jokes, lucky colors done above ----------
+    // show initial data
+    renderCheckins();
+    renderMsgs();
+
+    // ---------- Utility: show daily birthday check again on load (already called above) ----------
+    // also update lucky color and joke every day if user leaves page open
+    setInterval(()=> {
+      const now = new Date();
+      // if midnight passed, update daily items
+      // simple check: if hour==0 and minute==0 (runs near midnight) update
+      if(now.getHours()===0 && now.getMinutes()===0){
+        showDailyJoke();
+        showLuckyColors();
+        renderDate();
+        checkSpecialDay();
+      }
+    }, 60000);
+
+  </script>
 </body>
 </html>
-
